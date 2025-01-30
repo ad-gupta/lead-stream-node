@@ -22,14 +22,25 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const PORT = process.env.PORT || 4000;
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: "http://localhost:3000",
+    credentials: true,
+}));
 dotenv_1.default.config();
 app.post("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, leaderboard } = req.body;
-        let contain = yield redisService_1.default.get("leaderboard");
-        if (contain) {
+        console.log(name, leaderboard);
+        let type = yield redisService_1.default.type("leaderboard");
+        if (type === 'zset') {
             console.log("leaderboard already exists");
+            let leadboard = yield fetchLeaderboard();
+            const token = jsonwebtoken_1.default.sign({ id: name }, process.env.JWT_SECRET || "gvhbjnkm");
+            const expireIn = 10 * 60 * 1000;
+            res
+                .status(201)
+                .cookie("token", token, { maxAge: expireIn, httpOnly: true })
+                .json({ message: "Data stored in DB successfully", data: leadboard });
             return;
         }
         if (leaderboard && Array.isArray(leaderboard)) {
@@ -43,7 +54,7 @@ app.post("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             const expireIn = 10 * 60 * 1000;
             res
                 .status(201)
-                .cookie('token', token, { maxAge: expireIn, httpOnly: true })
+                .cookie("token", token, { maxAge: expireIn, httpOnly: true })
                 .json({ message: "Data stored in DB successfully", data: leaderboard });
         }
         else {
@@ -54,17 +65,6 @@ app.post("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.log(error);
     }
 }));
-const httpServer = http_1.default.createServer(app);
-const io = new socket_io_1.Server(httpServer, {
-    cors: {
-        origin: "*",
-        allowedHeaders: ["*"],
-    },
-});
-io.use((socket, next) => {
-    //   if (socket.handshake.auth.token) 
-    next();
-});
 function getLeaderboard(_a) {
     return __awaiter(this, arguments, void 0, function* ({ id, teamName, }) {
         let param = JSON.stringify({ teamName, id });
@@ -80,13 +80,53 @@ function getLeaderboard(_a) {
         return leaderboard;
     });
 }
+function fetchLeaderboard() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const result = yield redisService_1.default.zrevrange("leaderboard", 0, -1, "WITHSCORES");
+        let leaderboard = [];
+        for (let i = 0; i < result.length; i += 2) {
+            const { teamName, id } = JSON.parse(result[i]);
+            const points = parseInt(result[i + 1]);
+            leaderboard.push({ id, teamName, points });
+        }
+        return leaderboard;
+    });
+}
+app.get("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const data = yield fetchLeaderboard();
+        console.log(data);
+        res.status(200).json(data);
+    }
+    catch (error) {
+        console.log(error);
+    }
+}));
+const httpServer = http_1.default.createServer(app);
+const io = new socket_io_1.Server(httpServer, {
+    cors: {
+        origin: "http://localhost:3000",
+        allowedHeaders: ["*"],
+        credentials: true,
+    },
+});
+io.use((socket, next) => {
+    //   cookieParser()(socket.request as Request, {} as Response, (err) => {
+    //     if (err) return next(err);
+    //     const token = (socket.request as Request).cookies.token;
+    //     if (!token) return next(new Error("No token provided."));
+    //     const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+    //     if (!decoded) return next(new Error("Invalid token."));
+    // });
+    next();
+});
 io.on("connection", (socket) => {
     console.log("New client connected", socket.id);
     socket.on("message", ({ message }) => {
         console.log(message);
     });
     socket.on("update", (_a) => __awaiter(void 0, [_a], void 0, function* ({ teamId, teamName }) {
-        // console.log('on click update', {id: teamId, teamName})
+        console.log("on click update", { id: teamId, teamName });
         let updatedleaderboard = yield getLeaderboard({ id: teamId, teamName });
         io.emit("update-leaderboard", updatedleaderboard);
         // console.log("Message sent...")
@@ -95,6 +135,13 @@ io.on("connection", (socket) => {
         console.log("Client disconnected", socket.id);
     });
 });
+// redisClient.type("leaderboard").then((type) => {
+//   if (type !== "zset") {
+//     console.error(`Expected "leaderboard" to be a sorted set, but got ${type}`);
+//   } else {
+//     redisClient.zrange("leaderboard", 0, -1).then((elem) => console.log(elem));
+//   }
+// });
 httpServer.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });
