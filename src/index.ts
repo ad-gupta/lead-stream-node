@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 app.use(
   cors({
-    origin: "*",
+    origin: ["http://localhost:3000", "https://leaderboard-live1.vercel.app"],
     credentials: true,
   })
 );
@@ -136,7 +136,7 @@ const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: ["http://localhost:3000", "https://leaderboard-live1.vercel.app"],
     allowedHeaders: ["*"],
     credentials: true,
   },
