@@ -173,6 +173,11 @@ io.on("connection", (socket) => {
       console.log("Message sent...")
     }
   );
+
+  socket.on('show-leaderboard', async() => {
+    let updatedleaderboard = await fetchLeaderboard()
+    io.emit("update-leaderboard", updatedleaderboard);
+  })
   socket.on("disconnect", () => {
     console.log("Client disconnected", socket.id);
   });
