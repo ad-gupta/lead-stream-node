@@ -22,20 +22,17 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const PORT = process.env.PORT || 4000;
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
-app.use((0, cors_1.default)({
-    origin: "http://localhost:3000",
-    credentials: true,
-}));
+app.use((0, cors_1.default)());
 dotenv_1.default.config();
 app.post("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { name, leaderboard } = req.body;
-        console.log(name, leaderboard);
+        const { leaderboard } = req.body;
+        console.log(leaderboard);
         let type = yield redisService_1.default.type("leaderboard");
         if (type === 'zset') {
             console.log("leaderboard already exists");
             let leadboard = yield fetchLeaderboard();
-            const token = jsonwebtoken_1.default.sign({ id: name }, process.env.JWT_SECRET || "gvhbjnkm");
+            const token = jsonwebtoken_1.default.sign({ id: 'name' }, process.env.JWT_SECRET || "gvhbjnkm");
             const expireIn = 10 * 60 * 1000;
             res
                 .status(201)
@@ -50,7 +47,7 @@ app.post("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
                 yield redisService_1.default.zadd("leaderboard", points, JSON.stringify({ teamName, id }));
                 yield redisService_1.default.expire("leaderboard", 600);
             }));
-            const token = jsonwebtoken_1.default.sign({ id: name }, process.env.JWT_SECRET || "gvhbjnkm");
+            const token = jsonwebtoken_1.default.sign({ id: 'name' }, process.env.JWT_SECRET || "gvhbjnkm");
             const expireIn = 10 * 60 * 1000;
             res
                 .status(201)
@@ -102,24 +99,27 @@ app.get("/api", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         console.log(error);
     }
 }));
+app.get('/', (req, res) => {
+    res.json({ message: "Hello" });
+});
 const httpServer = http_1.default.createServer(app);
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "*",
         allowedHeaders: ["*"],
-        credentials: true,
+        // credentials: true,
     },
 });
-io.use((socket, next) => {
-    //   cookieParser()(socket.request as Request, {} as Response, (err) => {
-    //     if (err) return next(err);
-    //     const token = (socket.request as Request).cookies.token;
-    //     if (!token) return next(new Error("No token provided."));
-    //     const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-    //     if (!decoded) return next(new Error("Invalid token."));
-    // });
-    next();
-});
+// io.use((socket, next) => {
+//   //   cookieParser()(socket.request as Request, {} as Response, (err) => {
+//   //     if (err) return next(err);
+//   //     const token = (socket.request as Request).cookies.token;
+//   //     if (!token) return next(new Error("No token provided."));
+//   //     const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+//   //     if (!decoded) return next(new Error("Invalid token."));
+//   // });
+//   next();
+// });
 io.on("connection", (socket) => {
     console.log("New client connected", socket.id);
     socket.on("message", ({ message }) => {
@@ -129,19 +129,12 @@ io.on("connection", (socket) => {
         console.log("on click update", { id: teamId, teamName });
         let updatedleaderboard = yield getLeaderboard({ id: teamId, teamName });
         io.emit("update-leaderboard", updatedleaderboard);
-        // console.log("Message sent...")
+        console.log("Message sent...");
     }));
     socket.on("disconnect", () => {
         console.log("Client disconnected", socket.id);
     });
 });
-// redisClient.type("leaderboard").then((type) => {
-//   if (type !== "zset") {
-//     console.error(`Expected "leaderboard" to be a sorted set, but got ${type}`);
-//   } else {
-//     redisClient.zrange("leaderboard", 0, -1).then((elem) => console.log(elem));
-//   }
-// });
 httpServer.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
 });

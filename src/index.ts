@@ -11,17 +11,14 @@ const PORT = process.env.PORT || 4000;
 const app = express();
 app.use(express.json());
 app.use(
-  cors({
-    origin: "https://leaderboard-live1.vercel.app",
-    credentials: true,
-  })
+  cors()
 );
 dotenv.config();
 
 app.post("/api", async (req: Request, res: Response) => {
   try {
-    const { name, leaderboard } = req.body;
-    console.log(name, leaderboard);
+    const { leaderboard } = req.body;
+    console.log(leaderboard);
 
     let type = await redisClient.type("leaderboard");
 
@@ -30,7 +27,7 @@ app.post("/api", async (req: Request, res: Response) => {
 
       let leadboard = await fetchLeaderboard();
       const token = jwt.sign(
-        { id: name },
+        { id: 'name' },
         process.env.JWT_SECRET || "gvhbjnkm"
       );
       const expireIn = 10 * 60 * 1000;
@@ -58,7 +55,7 @@ app.post("/api", async (req: Request, res: Response) => {
       });
 
       const token = jwt.sign(
-        { id: name },
+        { id: 'name' },
         process.env.JWT_SECRET || "gvhbjnkm"
       );
       const expireIn = 10 * 60 * 1000;
@@ -132,29 +129,33 @@ app.get("/api", async (req: Request, res: Response) => {
     console.log(error);
   }
 });
+
+app.get('/', (req: Request, res: Response) => {
+  res.json({message: "Hello"})
+})
 const httpServer = http.createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: "https://leaderboard-live1.vercel.app",
+    origin: "*",
     allowedHeaders: ["*"],
-    credentials: true,
+    // credentials: true,
   },
 });
 
-io.use((socket, next) => {
-  //   cookieParser()(socket.request as Request, {} as Response, (err) => {
-  //     if (err) return next(err);
+// io.use((socket, next) => {
+//   //   cookieParser()(socket.request as Request, {} as Response, (err) => {
+//   //     if (err) return next(err);
 
-  //     const token = (socket.request as Request).cookies.token;
-  //     if (!token) return next(new Error("No token provided."));
+//   //     const token = (socket.request as Request).cookies.token;
+//   //     if (!token) return next(new Error("No token provided."));
 
-  //     const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+//   //     const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
 
-  //     if (!decoded) return next(new Error("Invalid token."));
-  // });
-  next();
-});
+//   //     if (!decoded) return next(new Error("Invalid token."));
+//   // });
+//   next();
+// });
 
 io.on("connection", (socket) => {
   console.log("New client connected", socket.id);
@@ -165,11 +166,11 @@ io.on("connection", (socket) => {
 
   socket.on(
     "update",
-    async ({ teamId, teamName }: { teamId: number; teamName: string }) => {
+    async({ teamId, teamName }: { teamId: number; teamName: string }) => {
       console.log("on click update", { id: teamId, teamName });
-      let updatedleaderboard = await getLeaderboard({ id: teamId, teamName });
+      let updatedleaderboard = await getLeaderboard({ id: teamId, teamName })
       io.emit("update-leaderboard", updatedleaderboard);
-      // console.log("Message sent...")
+      console.log("Message sent...")
     }
   );
   socket.on("disconnect", () => {
@@ -177,13 +178,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// redisClient.type("leaderboard").then((type) => {
-//   if (type !== "zset") {
-//     console.error(`Expected "leaderboard" to be a sorted set, but got ${type}`);
-//   } else {
-//     redisClient.zrange("leaderboard", 0, -1).then((elem) => console.log(elem));
-//   }
-// });
 
 httpServer.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
